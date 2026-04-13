@@ -1,0 +1,437 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Controle de Ponto</title>
+
+<!-- jsPDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<style>
+:root {
+    --azul: #2c7be5;
+    --verde: #28a745;
+    --vermelho: #b30000;
+    --cinza: #f4f6f8;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    background: var(--cinza);
+    margin: 0;
+    padding: 12px;
+}
+
+.container {
+    max-width: 900px;
+    margin: auto;
+}
+
+h2, h3 {
+    margin: 0 0 12px;
+}
+
+.card {
+    background: #fff;
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.08);
+}
+
+label {
+    font-weight: bold;
+    display: block;
+    margin-top: 10px;
+}
+
+input, textarea {
+    width: 100%;
+    padding: 10px;
+    font-size: 16px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    margin-top: 4px;
+}
+
+/* ✅ Campo de hora menor */
+input[type="time"] {
+    font-size: 14px;
+    padding: 6px 8px;
+}
+
+textarea {
+    resize: vertical;
+    min-height: 70px;
+}
+
+/* ✅ Checkbox Hora Extra alinhado e visível */
+.hora-extra-box {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 14px;
+    user-select: none;
+}
+
+.hora-extra-box input[type="checkbox"] {
+    width: 22px;
+    height: 22px;
+    cursor: pointer;
+}
+
+.hora-extra-box label {
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 14px;
+}
+
+button {
+    border: none;
+    border-radius: 8px;
+    padding: 14px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+button.primary {
+    background: var(--azul);
+    color: #fff;
+}
+
+button.secondary {
+    background: #6c757d;
+    color: #fff;
+}
+
+.status {
+    margin-top: 10px;
+    font-weight: bold;
+}
+
+/* Tabela responsiva */
+.table-wrap {
+    overflow-x: auto;
+}
+
+table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 600px;
+    background: #fff;
+}
+
+th, td {
+    padding: 10px;
+    border-bottom: 1px solid #ddd;
+    text-align: center;
+}
+
+th {
+    background: #f1f3f5;
+}
+
+/* Badges */
+.badge {
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.badge.extra {
+    background: #ffe5e5;
+    color: var(--vermelho);
+}
+
+.badge.banco {
+    background: #e6f0ff;
+    color: #004b8d;
+}
+
+.badge.normal {
+    background: #e7f6eb;
+    color: var(--verde);
+}
+
+/* Desktop */
+@media (min-width: 600px) {
+    .actions {
+        flex-direction: row;
+    }
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<h2>🕒 Controle de Ponto</h2>
+
+<div class="card">
+    <label>Data</label>
+    <input type="date" id="data">
+
+    <label>Hora</label>
+    <input type="time" id="hora">
+
+    <div class="hora-extra-box">
+        <input type="checkbox" id="horaExtra">
+        <label for="horaExtra">Marcar como Hora Extra</label>
+    </div>
+
+    <div class="actions">
+        <button class="primary" onclick="registrar()">
+            Registrar <span id="tipo">Entrada</span>
+        </button>
+        <button class="secondary" onclick="gerarPDF()">
+            Gerar PDF
+        </button>
+    </div>
+
+    <div id="status" class="status"></div>
+</div>
+
+<div class="card">
+    <h3>📝 Observações</h3>
+
+    <label>Data</label>
+    <input type="date" id="dataObs">
+
+    <label>Observação</label>
+    <textarea id="textoObs"></textarea>
+
+    <button class="primary" onclick="adicionarObservacao()" style="margin-top:10px;">
+        Adicionar Observação
+    </button>
+</div>
+
+<div class="card">
+    <h3>📋 Registros</h3>
+
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Entrada</th>
+                    <th>Saída</th>
+                    <th>Horas</th>
+                    <th>Classificação</th>
+                </tr>
+            </thead>
+            <tbody id="tabela"></tbody>
+        </table>
+    </div>
+</div>
+
+</div>
+
+<script>
+const { jsPDF } = window.jspdf;
+const JORNADA_PADRAO = 570;
+
+/* Utilidades */
+function preencherAgora() {
+    const agora = new Date();
+    const iso = agora.toISOString().split("T")[0];
+    data.value = iso;
+    dataObs.value = iso;
+    hora.value = agora.toTimeString().slice(0,5);
+}
+
+function formatarDataBR(d) {
+    const [a,m,di] = d.split("-");
+    return `${di}/${m}/${a}`;
+}
+
+function minutosTrabalhados(e,s) {
+    if (!e || !s) return 0;
+    let [h1,m1] = e.split(":").map(Number);
+    let [h2,m2] = s.split(":").map(Number);
+    let ini = h1*60 + m1;
+    let fim = h2*60 + m2;
+    if (fim < ini) fim += 1440;
+    return fim - ini;
+}
+
+function formatarMin(m) {
+    return `${Math.floor(m/60)}h ${m%60}min`;
+}
+
+/* Registro */
+function registrar() {
+    const d = data.value;
+    const h = hora.value;
+    const extra = horaExtra.checked;
+    let pontos = JSON.parse(localStorage.getItem("pontos")) || {};
+
+    if (!pontos[d]) {
+        pontos[d] = { entrada:h, saida:"", extra };
+        tipo.textContent="Saída";
+    } else if (!pontos[d].saida) {
+        pontos[d].saida=h;
+        pontos[d].extra ||= extra;
+        tipo.textContent="Entrada";
+    } else {
+        status.textContent="⚠️ Ponto completo neste dia";
+        return;
+    }
+
+    localStorage.setItem("pontos", JSON.stringify(pontos));
+    status.textContent="✅ Registro salvo";
+    carregarTabela();
+}
+
+/* Observações */
+function adicionarObservacao() {
+    if (!dataObs.value || !textoObs.value) {
+        alert("Preencha data e observação");
+        return;
+    }
+    let obs = JSON.parse(localStorage.getItem("obs")) || [];
+    obs.push({ data:dataObs.value, texto:textoObs.value });
+    localStorage.setItem("obs", JSON.stringify(obs));
+    textoObs.value="";
+    alert("Observação registrada");
+}
+
+/* Tabela */
+function carregarTabela() {
+    tabela.innerHTML="";
+    const pontos = JSON.parse(localStorage.getItem("pontos")) || {};
+    Object.keys(pontos).sort().forEach(d=>{
+        const r = pontos[d];
+        const min = minutosTrabalhados(r.entrada, r.saida);
+        let tipo="Normal", badge="normal";
+
+        if (r.extra) {
+            tipo="Hora Extra";
+            badge="extra";
+        } else if (min > JORNADA_PADRAO) {
+            tipo="Banco de Horas";
+            badge="banco";
+        }
+
+        tabela.innerHTML+=`
+        <tr>
+            <td>${formatarDataBR(d)}</td>
+            <td>${r.entrada}</td>
+            <td>${r.saida || "-"}</td>
+            <td>${min ? formatarMin(min) : "-"}</td>
+            <td><span class="badge ${badge}">${tipo}</span></td>
+        </tr>`;
+    });
+}
+
+/* PDF com linhas e colunas */
+function gerarPDF() {
+    const pontos = JSON.parse(localStorage.getItem("pontos")) || {};
+    const obs = JSON.parse(localStorage.getItem("obs")) || [];
+    const datas = Object.keys(pontos).sort();
+
+    let totalExtra = 0;
+    let totalBanco = 0;
+
+    const doc = new jsPDF("p","mm","a4");
+    const pageW = doc.internal.pageSize.getWidth();
+    const margin = 10;
+    const usable = pageW - margin * 2;
+
+    const colW = [
+        usable * 0.18,
+        usable * 0.17,
+        usable * 0.17,
+        usable * 0.18,
+        usable * 0.30
+    ];
+
+    const rowH = 8;
+    let y = 20;
+
+    doc.setFontSize(14);
+    doc.text("Relatório Mensal de Ponto", pageW/2, 14, {align:"center"});
+    doc.setFontSize(10);
+
+    function cabecalho() {
+        let x = margin;
+        ["Data","Entrada","Saída","Horas","Classificação"].forEach((t,i)=>{
+            doc.rect(x,y,colW[i],rowH);
+            doc.text(t, x + colW[i]/2, y+5, {align:"center"});
+            x+=colW[i];
+        });
+        y+=rowH;
+    }
+
+    function novaPagina() {
+        doc.addPage();
+        y=20;
+        cabecalho();
+    }
+
+    function linha(val) {
+        if (y>275) novaPagina();
+        let x = margin;
+        val.forEach((v,i)=>{
+            doc.rect(x,y,colW[i],rowH);
+            doc.text(String(v), x + colW[i]/2, y+5, {
+                align:"center",
+                maxWidth: colW[i]-4
+            });
+            x+=colW[i];
+        });
+        y+=rowH;
+    }
+
+    cabecalho();
+
+    datas.forEach(d=>{
+        const r=pontos[d];
+        const min=minutosTrabalhados(r.entrada,r.saida);
+        let tipo="Normal";
+        if(r.extra){ tipo="Hora Extra"; totalExtra+=min; }
+        else if(min>JORNADA_PADRAO){ tipo="Banco de Horas"; totalBanco+=min-JORNADA_PADRAO; }
+
+        linha([formatarDataBR(d), r.entrada||"-", r.saida||"-", min?formatarMin(min):"-", tipo]);
+    });
+
+    y+=10;
+    if (y>260) novaPagina();
+    doc.setFontSize(12);
+    doc.text("Resumo do Mês", margin, y);
+    y+=6;
+    doc.setFontSize(10);
+    doc.text(`Total de Horas Extras: ${formatarMin(totalExtra)}`, margin, y);
+    y+=5;
+    doc.text(`Total de Banco de Horas: ${formatarMin(totalBanco)}`, margin, y);
+
+    if (obs.length) {
+        y+=10;
+        doc.setFontSize(12);
+        doc.text("Observações", margin, y);
+        y+=6;
+        doc.setFontSize(10);
+        obs.forEach(o=>{
+            if (y>275) novaPagina();
+            doc.text(`• ${formatarDataBR(o.data)} - ${o.texto}`, margin, y, {maxWidth: usable});
+            y+=6;
+        });
+    }
+
+    doc.save("relatorio-ponto.pdf");
+}
+
+preencherAgora();
+carregarTabela();
+</script>
+</body>
+</html>
