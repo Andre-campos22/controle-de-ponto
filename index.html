@@ -1,5 +1,4 @@
 
-
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -7,7 +6,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Controle de Ponto</title>
 
-<!-- ✅ jsPDF CARREGADO CORRETAMENTE -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
@@ -37,20 +35,17 @@ body{
 
 label{font-weight:bold;display:block;margin-top:10px;}
 
-input[type="date"],
-input[type="time"]{
+input{
   width:100%;
   padding:10px;
   margin-top:4px;
 }
 
-/* ✅ Hora extra alinhada */
 .checkbox-inline{
   display:flex;
   align-items:center;
   gap:8px;
   margin-top:12px;
-  cursor:pointer;
 }
 
 .actions{
@@ -83,8 +78,6 @@ th,td{
   text-align:center;
 }
 
-th{background:#f1f3f5;}
-
 .badge{
   padding:4px 8px;
   border-radius:6px;
@@ -95,7 +88,6 @@ th{background:#f1f3f5;}
 .banco{background:#e6f0ff;color:#004b8d;}
 .extra{background:#fdecea;color:#c0392b;}
 
-/* ✅ Modal */
 .modal{
   position:fixed;
   inset:0;
@@ -138,8 +130,6 @@ th{background:#f1f3f5;}
     <button class="btn-saida" onclick="registrarSaida()">Saída</button>
     <button class="btn-pdf" onclick="gerarPDF()">Gerar PDF</button>
   </div>
-
-  <div id="status"></div>
 </div>
 
 <div class="card">
@@ -160,10 +150,10 @@ th{background:#f1f3f5;}
 </div>
 </div>
 
-<!-- ✅ MODAL DE EDIÇÃO -->
 <div id="modal" class="modal hidden">
   <div class="modal-box">
     <h3>Editar Registro</h3>
+
     <input type="hidden" id="editData">
     <input type="hidden" id="editId">
 
@@ -217,40 +207,63 @@ function classificar(r){
 /* ENTRADA */
 function registrarEntrada(){
   if(!data.value||!hora.value) return alert("Preencha data e hora");
+
   const p=getPontos();
   p[data.value]=p[data.value]||{registros:[]};
+
   if(p[data.value].registros.some(r=>!r.saida))
     return alert("Já existe uma entrada aberta");
+
   p[data.value].registros.push({
-    id:uid(),entrada:hora.value,saida:"",tipo:horaExtra.checked?"extra":"normal"
+    id:uid(),
+    entrada:hora.value,
+    saida:"",
+    tipo:horaExtra.checked?"extra":"normal"
   });
-  salvar(p);carregar();
+
+  horaExtra.checked=false;
+
+  salvar(p);
+  carregar();
 }
 
 /* SAÍDA */
 function registrarSaida(){
+  if(!data.value||!hora.value)
+    return alert("Preencha data e hora");
+
   const p=getPontos();
   if(!p[data.value]) return alert("Nenhuma entrada");
+
   const r=p[data.value].registros.find(r=>!r.saida);
   if(!r) return alert("Nenhuma entrada aberta");
+
   r.saida=hora.value;
-  salvar(p);carregar();
+
+  salvar(p);
+  carregar();
 }
 
 /* TABELA */
 function carregar(){
   tabela.innerHTML="";
   const p=getPontos();
-  Object.keys(p).sort().forEach(d=>{
+
+  Object.keys(p).sort((a,b)=>new Date(a)-new Date(b)).forEach(d=>{
+    let totalDia=0;
+
     p[d].registros.forEach(r=>{
       const m=minutos(r.entrada,r.saida);
+      totalDia+=m;
+
       const c=classificar(r);
+
       tabela.innerHTML+=`
       <tr>
         <td>${br(d)}</td>
         <td>${r.entrada}</td>
         <td>${r.saida||"-"}</td>
-        <td>${m?hmin(m):"-"}</td>
+        <td>${r.saida?hmin(m):"-"}</td>
         <td><span class="badge ${c.cls}">${c.txt}</span></td>
         <td>
           <button class="btn-edit" onclick="editar('${d}','${r.id}')">✏️</button>
@@ -258,10 +271,15 @@ function carregar(){
         </td>
       </tr>`;
     });
+
+    tabela.innerHTML+=`
+    <tr>
+      <td colspan="6"><strong>Total do dia: ${hmin(totalDia)}</strong></td>
+    </tr>`;
   });
 }
 
-/* ✅ EDITAR */
+/* EDIT */
 function editar(d,id){
   const r=getPontos()[d].registros.find(x=>x.id===id);
   editData.value=d;
@@ -275,10 +293,14 @@ function editar(d,id){
 function salvarEdicao(){
   const p=getPontos();
   const r=p[editData.value].registros.find(x=>x.id===editId.value);
+
   r.entrada=editEntrada.value;
   r.saida=editSaida.value;
   r.tipo=editExtra.checked?"extra":"normal";
-  salvar(p);fecharModal();carregar();
+
+  salvar(p);
+  fecharModal();
+  carregar();
 }
 
 function fecharModal(){modal.classList.add("hidden");}
@@ -287,27 +309,41 @@ function excluir(d,id){
   if(!confirm("Excluir registro?")) return;
   const p=getPontos();
   p[d].registros=p[d].registros.filter(r=>r.id!==id);
-  salvar(p);carregar();
+  salvar(p);
+  carregar();
 }
 
-/* ✅ PDF FUNCIONANDO */
+/* PDF */
 function gerarPDF(){
   const doc=new jsPDF();
   let y=20;
+
+  doc.setFontSize(16);
   doc.text("Relatório de Ponto",105,y,{align:"center"});
   y+=10;
 
   const p=getPontos();
+
   Object.keys(p).sort().forEach(d=>{
+    doc.setFontSize(12);
+    doc.text(`Data: ${br(d)}`,10,y);
+    y+=6;
+
     p[d].registros.forEach(r=>{
+      const tempo = r.saida ? hmin(minutos(r.entrada,r.saida)) : "--";
+
       doc.text(
-        `${br(d)} | ${r.entrada}-${r.saida||"--"} | ${hmin(minutos(r.entrada,r.saida))}`,
-        10,y
+        `• ${r.entrada} - ${r.saida||"--"} | ${tempo}`,
+        12,y
       );
+
       y+=6;
       if(y>280){doc.addPage();y=20;}
     });
+
+    y+=4;
   });
+
   doc.save("ponto.pdf");
 }
 
@@ -322,4 +358,3 @@ function gerarPDF(){
 
 </body>
 </html>
-
