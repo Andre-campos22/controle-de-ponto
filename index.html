@@ -9,102 +9,49 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
-:root{
-  --azul:#2c7be5;
-  --vermelho:#c0392b;
-  --verde:#28a745;
-  --cinza:#f4f6f8;
-}
-
-body{
-  font-family:Arial,sans-serif;
-  background:var(--cinza);
-  margin:0;
-  padding:12px;
-}
-
+body{font-family:Arial;background:#f4f6f8;margin:0;padding:10px;}
 .container{max-width:900px;margin:auto;}
 
 .card{
   background:#fff;
-  padding:16px;
+  padding:14px;
   border-radius:10px;
-  margin-bottom:16px;
-  box-shadow:0 2px 8px rgba(0,0,0,.08);
+  margin-bottom:12px;
 }
 
-label{font-weight:bold;display:block;margin-top:10px;}
+input{width:100%;padding:12px;margin-top:6px;font-size:16px;}
 
-input{
-  width:100%;
-  padding:10px;
-  margin-top:4px;
-}
-
-.checkbox-inline{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  margin-top:12px;
-}
-
-.actions{
-  display:flex;
-  gap:10px;
-  margin-top:14px;
-  flex-wrap:wrap;
-}
+.actions{display:flex;flex-direction:column;gap:10px;margin-top:10px;}
 
 button{
-  border:none;
-  border-radius:8px;
-  padding:12px 16px;
-  font-weight:bold;
-  cursor:pointer;
-  color:#fff;
+  padding:14px;border:none;border-radius:10px;
+  color:#fff;font-weight:bold;cursor:pointer;
 }
 
-.btn-entrada{background:var(--azul);}
-.btn-saida{background:var(--vermelho);}
-.btn-pdf{background:var(--verde);}
+.btn-entrada{background:#2c7be5;}
+.btn-saida{background:#c0392b;}
+.btn-pdf{background:#28a745;}
 .btn-edit{background:#6c757d;}
-.btn-delete{background:#000;}
 
 table{width:100%;border-collapse:collapse;}
-
-th,td{
-  padding:8px;
-  border-bottom:1px solid #ddd;
-  text-align:center;
-}
-
-.badge{
-  padding:4px 8px;
-  border-radius:6px;
-  font-size:12px;
-}
-
-.normal{background:#e7f6eb;color:#28a745;}
-.banco{background:#e6f0ff;color:#004b8d;}
-.extra{background:#fdecea;color:#c0392b;}
+th,td{padding:8px;border-bottom:1px solid #ddd;text-align:center;}
 
 .modal{
-  position:fixed;
-  inset:0;
-  background:rgba(0,0,0,.4);
-  display:flex;
-  align-items:center;
-  justify-content:center;
+  position:fixed;inset:0;
+  background:rgba(0,0,0,.5);
+  display:flex;align-items:center;justify-content:center;
 }
-
 .hidden{display:none;}
 
 .modal-box{
-  background:#fff;
-  padding:20px;
-  border-radius:10px;
-  width:320px;
+  background:#fff;padding:20px;border-radius:10px;width:300px;
 }
+
+.card p{
+  display:flex;
+  justify-content:space-between;
+}
+span{font-weight:bold;color:#2c7be5;}
 </style>
 </head>
 
@@ -114,245 +61,241 @@ th,td{
 <h2>🕒 Controle de Ponto</h2>
 
 <div class="card">
-  <label>Data</label>
-  <input type="date" id="data">
+<input type="date" id="data">
+<input type="time" id="hora">
 
-  <label>Hora</label>
-  <input type="time" id="hora">
+<label>
+<input type="checkbox" id="horaExtra"> Hora Extra
+</label>
 
-  <label class="checkbox-inline">
-    <input type="checkbox" id="horaExtra">
-    Hora Extra
-  </label>
-
-  <div class="actions">
-    <button class="btn-entrada" onclick="registrarEntrada()">Entrada</button>
-    <button class="btn-saida" onclick="registrarSaida()">Saída</button>
-    <button class="btn-pdf" onclick="gerarPDF()">Gerar PDF</button>
-  </div>
+<div class="actions">
+<button class="btn-entrada" onclick="entrada()">Entrada</button>
+<button class="btn-saida" onclick="saida()">Saída</button>
+<button class="btn-pdf" onclick="pdf()">PDF</button>
+</div>
 </div>
 
 <div class="card">
-<h3>📋 Registros</h3>
+<h3>📋 Registros (Mês Atual)</h3>
 <table>
 <thead>
 <tr>
-  <th>Data</th>
-  <th>Entrada</th>
-  <th>Saída</th>
-  <th>Horas</th>
-  <th>Classificação</th>
-  <th>Ações</th>
+<th>Data</th><th>Entrada</th><th>Saída</th><th>Horas</th><th>Ações</th>
 </tr>
 </thead>
 <tbody id="tabela"></tbody>
 </table>
 </div>
+
+<div class="card">
+<h3>📊 Resumo</h3>
+<p>Total Trabalhado: <span id="total"></span></p>
+<p>Banco (+): <span id="pos"></span></p>
+<p>Banco (-): <span id="neg"></span></p>
+<p>Horas Extras: <span id="extra"></span></p>
 </div>
 
+</div>
+
+<!-- MODAL -->
 <div id="modal" class="modal hidden">
-  <div class="modal-box">
-    <h3>Editar Registro</h3>
+<div class="modal-box">
+<h3>Editar</h3>
 
-    <input type="hidden" id="editData">
-    <input type="hidden" id="editId">
+<input type="hidden" id="eid">
 
-    <label>Entrada</label>
-    <input type="time" id="editEntrada">
+<label>Entrada</label>
+<input type="time" id="eentrada">
 
-    <label>Saída</label>
-    <input type="time" id="editSaida">
+<label>Saída</label>
+<input type="time" id="esaida">
 
-    <label class="checkbox-inline">
-      <input type="checkbox" id="editExtra">
-      Hora Extra
-    </label>
+<label>
+<input type="checkbox" id="eextra"> Hora Extra
+</label>
 
-    <div class="actions">
-      <button class="btn-entrada" onclick="salvarEdicao()">Salvar</button>
-      <button class="btn-saida" onclick="fecharModal()">Cancelar</button>
-    </div>
-  </div>
+<div class="actions">
+<button class="btn-entrada" onclick="salvarEdit()">Salvar</button>
+<button class="btn-saida" onclick="modal.classList.add('hidden')">Cancelar</button>
+</div>
+</div>
 </div>
 
 <script>
 const { jsPDF } = window.jspdf;
 const JORNADA = 570;
 
-/* UTIL */
-const getPontos=()=>JSON.parse(localStorage.getItem("pontos"))||{};
-const salvar=p=>localStorage.setItem("pontos",JSON.stringify(p));
-const uid=()=>Math.random().toString(16).slice(2,9);
+/* STORAGE */
+const get=()=>JSON.parse(localStorage.getItem("p"))||{};
+const save=p=>localStorage.setItem("p",JSON.stringify(p));
 
+const mesAtual=()=>new Date().toISOString().slice(0,7);
+
+/* TEMPO */
 function minutos(e,s){
-  if(!e||!s) return 0;
-  let [h1,m1]=e.split(":").map(Number);
-  let [h2,m2]=s.split(":").map(Number);
-  let i=h1*60+m1,f=h2*60+m2;
-  if(f<i) f+=1440;
-  return f-i;
+ if(!e||!s)return 0;
+
+ let [h1,m1]=e.split(":").map(Number);
+ let [h2,m2]=s.split(":").map(Number);
+
+ let i=h1*60+m1,f=h2*60+m2;
+
+ if(f<i)f+=1440;
+
+ return f-i;
 }
-const hmin=m=>`${Math.floor(m/60)}h ${m%60}min`;
+
+const h=m=>`${Math.floor(m/60)}h ${m%60}min`;
 const br=d=>d.split("-").reverse().join("/");
 
-/* CLASSIFICA */
-function classificar(r){
-  const t=minutos(r.entrada,r.saida);
-  if(r.tipo==="extra") return {txt:"Hora Extra",cls:"extra"};
-  const s=t-JORNADA;
-  if(s===0) return {txt:"Normal",cls:"normal"};
-  return {txt:s>0?"Banco (+)":"Banco (-)",cls:"banco"};
-}
-
 /* ENTRADA */
-function registrarEntrada(){
-  if(!data.value||!hora.value) return alert("Preencha data e hora");
+function entrada(){
+ if(!data.value||!hora.value)return alert("Preencha");
 
-  const p=getPontos();
-  p[data.value]=p[data.value]||{registros:[]};
+ const p=get();
+ p[data.value]=p[data.value]||[];
 
-  if(p[data.value].registros.some(r=>!r.saida))
-    return alert("Já existe uma entrada aberta");
+ if(p[data.value].some(r=>!r.s))
+  return alert("Já existe entrada aberta");
 
-  p[data.value].registros.push({
-    id:uid(),
-    entrada:hora.value,
-    saida:"",
-    tipo:horaExtra.checked?"extra":"normal"
-  });
+ p[data.value].push({
+  id:Date.now(),
+  e:hora.value,
+  s:"",
+  t:horaExtra.checked?"extra":"normal"
+ });
 
-  horaExtra.checked=false;
-
-  salvar(p);
-  carregar();
+ horaExtra.checked=false;
+ save(p);load();
 }
 
 /* SAÍDA */
-function registrarSaida(){
-  if(!data.value||!hora.value)
-    return alert("Preencha data e hora");
+function saida(){
+ if(!data.value||!hora.value)return alert("Preencha");
 
-  const p=getPontos();
-  if(!p[data.value]) return alert("Nenhuma entrada");
+ const p=get();
+ if(!p[data.value]) return;
 
-  const r=p[data.value].registros.find(r=>!r.saida);
-  if(!r) return alert("Nenhuma entrada aberta");
+ const r=p[data.value].find(x=>!x.s);
+ if(!r) return;
 
-  r.saida=hora.value;
+ r.s=hora.value;
 
-  salvar(p);
-  carregar();
+ save(p);load();
 }
 
-/* TABELA */
-function carregar(){
-  tabela.innerHTML="";
-  const p=getPontos();
+/* EDITAR */
+function edit(d,id){
+ const r=get()[d].find(x=>x.id==id);
 
-  Object.keys(p).sort((a,b)=>new Date(a)-new Date(b)).forEach(d=>{
-    let totalDia=0;
+ eid.value=id;
+ eid.dataset.data=d;
 
-    p[d].registros.forEach(r=>{
-      const m=minutos(r.entrada,r.saida);
-      totalDia+=m;
+ eentrada.value=r.e;
+ esaida.value=r.s;
+ eextra.checked=r.t==="extra";
 
-      const c=classificar(r);
+ modal.classList.remove("hidden");
+}
 
-      tabela.innerHTML+=`
-      <tr>
-        <td>${br(d)}</td>
-        <td>${r.entrada}</td>
-        <td>${r.saida||"-"}</td>
-        <td>${r.saida?hmin(m):"-"}</td>
-        <td><span class="badge ${c.cls}">${c.txt}</span></td>
-        <td>
-          <button class="btn-edit" onclick="editar('${d}','${r.id}')">✏️</button>
-          <button class="btn-delete" onclick="excluir('${d}','${r.id}')">🗑️</button>
-        </td>
-      </tr>`;
-    });
+function salvarEdit(){
+ const p=get();
+ const d=eid.dataset.data;
 
-    tabela.innerHTML+=`
-    <tr>
-      <td colspan="6"><strong>Total do dia: ${hmin(totalDia)}</strong></td>
-    </tr>`;
+ const r=p[d].find(x=>x.id==eid.value);
+
+ r.e=eentrada.value;
+ r.s=esaida.value;
+ r.t=eextra.checked?"extra":"normal";
+
+ save(p);
+ modal.classList.add("hidden");
+ load();
+}
+
+/* LOAD + RESUMO */
+function load(){
+ tabela.innerHTML="";
+
+ const p=get();
+ const mes=mesAtual();
+
+ let total=0;
+ let pos=0;
+ let neg=0;
+ let extra=0;
+
+ Object.keys(p).forEach(d=>{
+  if(!d.startsWith(mes)) return;
+
+  p[d].forEach(r=>{
+   let m=minutos(r.e,r.s);
+
+   total+=m;
+
+   if(r.t==="extra"){
+     extra+=m;
+   }else{
+     let saldo = m - JORNADA;
+
+     if(saldo > 0){
+       pos += saldo;
+     }else if(saldo < 0){
+       neg += Math.abs(saldo);
+     }
+   }
+
+   tabela.innerHTML+=`
+   <tr>
+   <td>${br(d)}</td>
+   <td>${r.e}</td>
+   <td>${r.s||"-"}</td>
+   <td>${r.s?h(m):"-"}</td>
+   <td>
+    <button class="btn-edit" onclick="edit('${d}','${r.id}')">✏️</button>
+   </td>
+   </tr>`;
   });
-}
+ });
 
-/* EDIT */
-function editar(d,id){
-  const r=getPontos()[d].registros.find(x=>x.id===id);
-  editData.value=d;
-  editId.value=id;
-  editEntrada.value=r.entrada;
-  editSaida.value=r.saida;
-  editExtra.checked=r.tipo==="extra";
-  modal.classList.remove("hidden");
-}
-
-function salvarEdicao(){
-  const p=getPontos();
-  const r=p[editData.value].registros.find(x=>x.id===editId.value);
-
-  r.entrada=editEntrada.value;
-  r.saida=editSaida.value;
-  r.tipo=editExtra.checked?"extra":"normal";
-
-  salvar(p);
-  fecharModal();
-  carregar();
-}
-
-function fecharModal(){modal.classList.add("hidden");}
-
-function excluir(d,id){
-  if(!confirm("Excluir registro?")) return;
-  const p=getPontos();
-  p[d].registros=p[d].registros.filter(r=>r.id!==id);
-  salvar(p);
-  carregar();
+ document.getElementById("total").innerText=h(total);
+ document.getElementById("pos").innerText=h(pos);
+ document.getElementById("neg").innerText=h(neg);
+ document.getElementById("extra").innerText=h(extra);
 }
 
 /* PDF */
-function gerarPDF(){
-  const doc=new jsPDF();
-  let y=20;
+function pdf(){
+ const doc=new jsPDF();
+ let y=20;
 
-  doc.setFontSize(16);
-  doc.text("Relatório de Ponto",105,y,{align:"center"});
-  y+=10;
+ doc.text("Relatório Mensal",105,y,{align:"center"});
+ y+=10;
 
-  const p=getPontos();
+ const p=get();
+ const mes=mesAtual();
 
-  Object.keys(p).sort().forEach(d=>{
-    doc.setFontSize(12);
-    doc.text(`Data: ${br(d)}`,10,y);
-    y+=6;
+ Object.keys(p).forEach(d=>{
+  if(!d.startsWith(mes)) return;
 
-    p[d].registros.forEach(r=>{
-      const tempo = r.saida ? hmin(minutos(r.entrada,r.saida)) : "--";
+  doc.text(br(d),10,y); y+=6;
 
-      doc.text(
-        `• ${r.entrada} - ${r.saida||"--"} | ${tempo}`,
-        12,y
-      );
-
-      y+=6;
-      if(y>280){doc.addPage();y=20;}
-    });
-
-    y+=4;
+  p[d].forEach(r=>{
+   const t=r.s?h(minutos(r.e,r.s)):"--";
+   doc.text(`${r.e}-${r.s||"--"} ${t}`,10,y);
+   y+=6;
   });
+ });
 
-  doc.save("ponto.pdf");
+ doc.save("ponto.pdf");
 }
 
 /* INIT */
 (()=>{
-  const n=new Date();
-  data.value=n.toISOString().split("T")[0];
-  hora.value=n.toTimeString().slice(0,5);
-  carregar();
+ const n=new Date();
+ data.value=n.toISOString().split("T")[0];
+ hora.value=n.toTimeString().slice(0,5);
+ load();
 })();
 </script>
 
