@@ -11,15 +11,11 @@
 <style>
 body{font-family:Arial;background:#f4f6f8;margin:0;padding:10px;}
 .container{max-width:900px;margin:auto;}
+.card{background:#fff;padding:14px;border-radius:10px;margin-bottom:12px;}
 
-.card{
-  background:#fff;
-  padding:14px;
-  border-radius:10px;
-  margin-bottom:12px;
+input, select, textarea{
+  width:100%;padding:12px;margin-top:6px;font-size:16px;
 }
-
-input{width:100%;padding:12px;margin-top:6px;font-size:16px;}
 
 .actions{display:flex;flex-direction:column;gap:10px;margin-top:10px;}
 
@@ -46,12 +42,6 @@ th,td{padding:8px;border-bottom:1px solid #ddd;text-align:center;}
 .modal-box{
   background:#fff;padding:20px;border-radius:10px;width:300px;
 }
-
-.card p{
-  display:flex;
-  justify-content:space-between;
-}
-span{font-weight:bold;color:#2c7be5;}
 </style>
 </head>
 
@@ -61,6 +51,10 @@ span{font-weight:bold;color:#2c7be5;}
 <h2>🕒 Controle de Ponto</h2>
 
 <div class="card">
+
+<label>Mês</label>
+<input type="month" id="mesFiltro">
+
 <input type="date" id="data">
 <input type="time" id="hora">
 
@@ -68,19 +62,22 @@ span{font-weight:bold;color:#2c7be5;}
 <input type="checkbox" id="horaExtra"> Hora Extra
 </label>
 
+<label>Observação</label>
+<textarea id="obs"></textarea>
+
 <div class="actions">
-<button class="btn-entrada" onclick="entrada()">Entrada</button>
-<button class="btn-saida" onclick="saida()">Saída</button>
+<button class="btn-entrada" onclick="agora(); entrada()">Entrada</button>
+<button class="btn-saida" onclick="agora(); saida()">Saída</button>
 <button class="btn-pdf" onclick="pdf()">PDF</button>
 </div>
 </div>
 
 <div class="card">
-<h3>📋 Registros (Mês Atual)</h3>
+<h3>📋 Registros</h3>
 <table>
 <thead>
 <tr>
-<th>Data</th><th>Entrada</th><th>Saída</th><th>Horas</th><th>Ações</th>
+<th>Data</th><th>Entrada</th><th>Saída</th><th>Horas</th><th>Obs</th><th>Ações</th>
 </tr>
 </thead>
 <tbody id="tabela"></tbody>
@@ -89,10 +86,10 @@ span{font-weight:bold;color:#2c7be5;}
 
 <div class="card">
 <h3>📊 Resumo</h3>
-<p>Total Trabalhado: <span id="total"></span></p>
+<p>Total: <span id="total"></span></p>
 <p>Banco (+): <span id="pos"></span></p>
 <p>Banco (-): <span id="neg"></span></p>
-<p>Horas Extras: <span id="extra"></span></p>
+<p>Extra: <span id="extra"></span></p>
 </div>
 
 </div>
@@ -100,6 +97,7 @@ span{font-weight:bold;color:#2c7be5;}
 <!-- MODAL -->
 <div id="modal" class="modal hidden">
 <div class="modal-box">
+
 <h3>Editar</h3>
 
 <input type="hidden" id="eid">
@@ -114,10 +112,14 @@ span{font-weight:bold;color:#2c7be5;}
 <input type="checkbox" id="eextra"> Hora Extra
 </label>
 
+<label>Observação</label>
+<textarea id="eobs"></textarea>
+
 <div class="actions">
 <button class="btn-entrada" onclick="salvarEdit()">Salvar</button>
 <button class="btn-saida" onclick="modal.classList.add('hidden')">Cancelar</button>
 </div>
+
 </div>
 </div>
 
@@ -125,11 +127,14 @@ span{font-weight:bold;color:#2c7be5;}
 const { jsPDF } = window.jspdf;
 const JORNADA = 570;
 
-/* STORAGE */
 const get=()=>JSON.parse(localStorage.getItem("p"))||{};
 const save=p=>localStorage.setItem("p",JSON.stringify(p));
 
-const mesAtual=()=>new Date().toISOString().slice(0,7);
+/* HORA AGORA */
+function agora(){
+ const n=new Date();
+ hora.value=n.toTimeString().slice(0,5);
+}
 
 /* TEMPO */
 function minutos(e,s){
@@ -139,7 +144,6 @@ function minutos(e,s){
  let [h2,m2]=s.split(":").map(Number);
 
  let i=h1*60+m1,f=h2*60+m2;
-
  if(f<i)f+=1440;
 
  return f-i;
@@ -162,10 +166,13 @@ function entrada(){
   id:Date.now(),
   e:hora.value,
   s:"",
-  t:horaExtra.checked?"extra":"normal"
+  t:horaExtra.checked?"extra":"normal",
+  obs:obs.value
  });
 
+ obs.value="";
  horaExtra.checked=false;
+
  save(p);load();
 }
 
@@ -177,7 +184,11 @@ function saida(){
  if(!p[data.value]) return;
 
  const r=p[data.value].find(x=>!x.s);
- if(!r) return;
+
+ if(!r){
+  alert("Nenhuma entrada aberta");
+  return;
+ }
 
  r.s=hora.value;
 
@@ -194,6 +205,7 @@ function edit(d,id){
  eentrada.value=r.e;
  esaida.value=r.s;
  eextra.checked=r.t==="extra";
+ eobs.value=r.obs || "";
 
  modal.classList.remove("hidden");
 }
@@ -202,31 +214,31 @@ function salvarEdit(){
  const p=get();
  const d=eid.dataset.data;
 
- const r=p[d].find(x=>x.id==eid.value);
+ const r=p[d].find(x=>x.id==Number(eid.value));
 
  r.e=eentrada.value;
  r.s=esaida.value;
  r.t=eextra.checked?"extra":"normal";
+ r.obs=eobs.value;
 
  save(p);
  modal.classList.add("hidden");
  load();
 }
 
-/* LOAD + RESUMO */
+/* LOAD */
 function load(){
  tabela.innerHTML="";
 
  const p=get();
- const mes=mesAtual();
+ const mes=mesFiltro.value;
 
- let total=0;
- let pos=0;
- let neg=0;
- let extra=0;
+ let total=0,pos=0,neg=0,extra=0;
 
  Object.keys(p).forEach(d=>{
-  if(!d.startsWith(mes)) return;
+  if (!d.startsWith(mes)) return;
+
+  let totalDia=0;
 
   p[d].forEach(r=>{
    let m=minutos(r.e,r.s);
@@ -234,15 +246,9 @@ function load(){
    total+=m;
 
    if(r.t==="extra"){
-     extra+=m;
+    extra+=m;
    }else{
-     let saldo = m - JORNADA;
-
-     if(saldo > 0){
-       pos += saldo;
-     }else if(saldo < 0){
-       neg += Math.abs(saldo);
-     }
+    totalDia+=m;
    }
 
    tabela.innerHTML+=`
@@ -251,11 +257,17 @@ function load(){
    <td>${r.e}</td>
    <td>${r.s||"-"}</td>
    <td>${r.s?h(m):"-"}</td>
+   <td>${r.obs || "-"}</td>
    <td>
-    <button class="btn-edit" onclick="edit('${d}','${r.id}')">✏️</button>
+   <button class="btn-edit" onclick="edit('${d}','${r.id}')">✏️</button>
    </td>
    </tr>`;
   });
+
+  let saldo = totalDia - JORNADA;
+
+  if(saldo>0){pos+=saldo;}
+  else if(saldo<0){neg+=Math.abs(saldo);}
  });
 
  document.getElementById("total").innerText=h(total);
@@ -273,18 +285,31 @@ function pdf(){
  y+=10;
 
  const p=get();
- const mes=mesAtual();
+ const mes=mesFiltro.value;
 
  Object.keys(p).forEach(d=>{
   if(!d.startsWith(mes)) return;
 
-  doc.text(br(d),10,y); y+=6;
+  doc.text(br(d),10,y);
+  y+=6;
 
   p[d].forEach(r=>{
    const t=r.s?h(minutos(r.e,r.s)):"--";
    doc.text(`${r.e}-${r.s||"--"} ${t}`,10,y);
-   y+=6;
+   y+=5;
+
+   if(r.obs){
+    doc.text("Obs: "+r.obs,12,y);
+    y+=5;
+   }
+
+   if(y>280){
+    doc.addPage();
+    y=20;
+   }
   });
+
+  y+=4;
  });
 
  doc.save("ponto.pdf");
@@ -295,6 +320,10 @@ function pdf(){
  const n=new Date();
  data.value=n.toISOString().split("T")[0];
  hora.value=n.toTimeString().slice(0,5);
+
+ mesFiltro.value=n.toISOString().slice(0,7);
+ mesFiltro.addEventListener("change", load);
+
  load();
 })();
 </script>
