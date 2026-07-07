@@ -127,6 +127,9 @@ th,td{padding:8px;border-bottom:1px solid #ddd;text-align:center;}
 const { jsPDF } = window.jspdf;
 const JORNADA = 570;
 
+const LIMITE_11H = 660; // 11 horas
+let alertaExibido = false;
+
 const get=()=>JSON.parse(localStorage.getItem("p"))||{};
 const save=p=>localStorage.setItem("p",JSON.stringify(p));
 
@@ -315,6 +318,38 @@ function pdf(){
  doc.save("ponto.pdf");
 }
 
+function verificar11Horas() {
+  const hoje = new Date().toISOString().split("T")[0];
+  const p = get();
+
+  if (!p[hoje]) return;
+
+  let minutosTrabalhados = 0;
+
+  p[hoje].forEach(r => {
+    if (r.s) {
+      minutosTrabalhados += minutos(r.e, r.s);
+    } else {
+      const agoraHora = new Date().toTimeString().slice(0, 5);
+      minutosTrabalhados += minutos(r.e, agoraHora);
+    }
+  });
+
+  const faltam = LIMITE_11H - minutosTrabalhados;
+
+  if (faltam <= 20 && faltam > 0 && !alertaExibido) {
+    alertaExibido = true;
+
+    alert(
+      `⚠️ Atenção!\n\nFaltam apenas ${faltam} minutos para completar 11 horas de trabalho.`
+    );
+  }
+
+  if (faltam > 20) {
+    alertaExibido = false;
+  }
+}
+
 /* INIT */
 (()=>{
  const n=new Date();
@@ -325,6 +360,10 @@ function pdf(){
  mesFiltro.addEventListener("change", load);
 
  load();
+ 
+setInterval(verificar11Horas, 60000);
+verificar11Horas();
+
 })();
 </script>
 
